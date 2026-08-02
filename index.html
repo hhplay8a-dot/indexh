@@ -302,7 +302,7 @@
     <div class="sub" id="todayLabel">–</div>
     <div class="cover-row">
       <div>
-        <div class="month-total-label">คงเหลือสุทธิเดือนนี้</div>
+        <div class="month-total-label" id="netTotalLabel">คงเหลือสุทธิ</div>
         <div class="month-total" id="netTotal">฿0.00</div>
         <div class="mini-stats">
           <span class="mini income">+<span id="incomeTotal">0.00</span></span>
@@ -316,7 +316,7 @@
   <!-- Category proportion chart -->
   <div class="card hud">
     <span class="corner tr"></span><span class="corner bl"></span>
-    <div class="card-label">// สัดส่วนหมวดหมู่ · เดือนนี้</div>
+    <div class="card-label" id="chartCardLabel">// สัดส่วนหมวดหมู่ · วันนี้</div>
     <div class="type-toggle small" id="chartTypeToggle">
       <button class="active expense" data-type="expense">รายจ่าย</button>
       <button class="income" data-type="income">รายรับ</button>
@@ -652,13 +652,24 @@ function deleteEntry(id){
 }
 
 /* ---------------- Header ---------------- */
+function latestDataDate(){
+  if(entries.length===0) return todayLocalISO();
+  let max = entries[0].date;
+  for(const e of entries){ if(e.date>max) max = e.date; }
+  return max;
+}
+function dayRefLabel(dateStr){
+  if(dateStr===todayLocalISO()) return 'วันนี้';
+  return new Date(dateStr+'T00:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'});
+}
+
 function renderHeader(){
   const now = new Date();
   document.getElementById('todayLabel').textContent = now.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const ym = toLocalYearMonth(now);
-  const monthEntries = entries.filter(e=>e.date.slice(0,7)===ym);
-  const income = monthEntries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
-  const expense = monthEntries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  const latestDate = latestDataDate();
+  const dayEntries = entries.filter(e=>e.date===latestDate);
+  const income = dayEntries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const expense = dayEntries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
   const net = income - expense;
   const netEl = document.getElementById('netTotal');
   netEl.textContent = fmtMoney(net);
@@ -666,12 +677,14 @@ function renderHeader(){
   netEl.style.textShadow = net>=0 ? '0 0 14px rgba(57,255,136,0.4)' : '0 0 14px rgba(255,46,154,0.45)';
   document.getElementById('incomeTotal').textContent = fmtMoneyPlain(income);
   document.getElementById('expenseTotal').textContent = fmtMoneyPlain(expense);
+  document.getElementById('netTotalLabel').textContent = 'คงเหลือสุทธิ · ' + dayRefLabel(latestDate);
 }
 
 /* ---------------- Donut chart ---------------- */
 function renderChart(){
-  const ym = toLocalYearMonth(new Date());
-  const list = entries.filter(e=>e.date.slice(0,7)===ym && e.type===chartType);
+  const latestDate = latestDataDate();
+  document.getElementById('chartCardLabel').textContent = '// สัดส่วนหมวดหมู่ · ' + dayRefLabel(latestDate);
+  const list = entries.filter(e=>e.date===latestDate && e.type===chartType);
   const total = list.reduce((s,e)=>s+e.amount,0);
   document.getElementById('donutTotal').textContent = total ? fmtMoney(total) : '฿0';
   const donutEl = document.getElementById('donutChart');
@@ -681,7 +694,7 @@ function renderChart(){
   const rows = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
   if(rows.length===0){
     donutEl.style.background = 'var(--panel-alt)';
-    legendEl.innerHTML = `<div class="empty">ยังไม่มีข้อมูล${chartType==='income'?'รายรับ':'รายจ่าย'}เดือนนี้</div>`;
+    legendEl.innerHTML = `<div class="empty">ยังไม่มีข้อมูล${chartType==='income'?'รายรับ':'รายจ่าย'}${latestDate===todayLocalISO()?'วันนี้':'ในวันดังกล่าว'}</div>`;
     return;
   }
   let acc = 0;
